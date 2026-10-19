@@ -1,5 +1,5 @@
 # IoT Botnet Detection — Live Demo Dashboard
-### MSA-CNN · N-BaIoT · Leave-One-Device-Out Cross-Validation
+### Attention CNN · N-BaIoT · Leave-One-Device-Out Cross-Validation
 
 An interactive dashboard that demonstrates our attention-based CNN approach to IoT botnet detection. It replays real traffic samples from the **N-BaIoT** dataset device-by-device and visualises classification, alerts and device status in real time.
 
