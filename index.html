@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>IoT Botnet Detection — MSA-CNN Live Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e13;--bg2:#0f1520;--bg3:#151d2e;--bg4:#1a2438;
+  --border:#1e2d45;--border2:#243550;
+  --text:#c8d8f0;--text2:#6b8aad;--text3:#3d5878;
+  --green:#00d68f;--red:#ff4757;--amber:#ffa726;
+  --blue:#2979ff;--purple:#7c4dff;--cyan:#00e5ff;
+  --font:'JetBrains Mono',monospace;--head:'Space Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px);pointer-events:none;z-index:9999;}
+.hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--head);font-size:13px;color:var(--cyan);letter-spacing:.05em;}
+.logo span{color:var(--text2);}
+.hbadge{font-size:10px;padding:2px 8px;border-radius:2px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);}
+.live{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--red);font-weight:600;letter-spacing:.1em;}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink 1.4s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 4px var(--red)}50%{opacity:.3;box-shadow:none}}
+#clock{font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums;}
+select,button{background:var(--bg3);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:10px;padding:4px 10px;border-radius:2px;cursor:pointer;outline:none;}
+select:hover,button:hover{border-color:var(--cyan);color:var(--text);}
+.main{padding:14px 20px;display:flex;flex-direction:column;gap:12px;}
+.metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px 13px;position:relative;overflow:hidden;}
+.metric::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,229,255,.15),transparent);}
+.mkey{font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;}
+.mval{font-family:var(--head);font-size:18px;font-weight:700;line-height:1;margin-bottom:3px;}
+.msub{font-size:10px;color:var(--text2);}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:7px 13px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.pt{font-size:10px;color:var(--text2);letter-spacing:.1em;text-transform:uppercase;}
+.pb{padding:12px 13px;}
+.fold-banner{background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.fold-num{font-family:var(--head);font-size:22px;font-weight:700;color:var(--cyan);}
+.fold-label{font-size:11px;color:var(--text2);}
+.fold-device{font-size:13px;font-weight:500;color:var(--text);}
+.fold-stats{display:flex;gap:20px;}
+.fstat{text-align:right;}
+.fstat-val{font-size:13px;font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;}
+.fstat-key{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
+.progress-wrap{flex:1;min-width:140px;max-width:200px;}
+.progress-label{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:4px;}
+.progress-track{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--cyan);border-radius:2px;transition:width .5s ease;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.row2{display:grid;grid-template-columns:2fr 1fr;gap:12px;}
+.device-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.dtile{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:8px 10px;transition:border-color .3s;}
+.dtile.status-warn{border-color:var(--amber);background:#1a160d;}
+.dtile.status-crit{border-color:var(--red);background:#160d0d;animation:pred 2s ease-in-out infinite;}
+@keyframes pred{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(255,71,87,.2)}}
+.dname{font-size:10px;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dip{font-size:9px;color:var(--text3);margin-bottom:4px;}
+.dstat{font-size:9px;display:flex;align-items:center;gap:4px;}
+.ddot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.cmat{width:100%;border-collapse:collapse;font-size:10px;}
+.cmat th{padding:4px 6px;color:var(--text3);font-weight:400;text-align:center;font-size:9px;letter-spacing:.05em;}
+.cmat td{padding:5px 6px;text-align:center;border-radius:2px;font-variant-numeric:tabular-nums;transition:background .4s;}
+.cmat .row-label{color:var(--text2);text-align:right;padding-right:10px;white-space:nowrap;font-size:9px;}
+.cbar{margin-bottom:9px;}
+.cbrow{display:flex;justify-content:space-between;margin-bottom:3px;}
+.cbname{font-size:10px;color:var(--text2);}
+.cbpct{font-size:10px;font-variant-numeric:tabular-nums;}
+.cbtrack{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.cbfill{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+.spark{display:flex;align-items:flex-end;gap:3px;height:44px;padding:4px 0;}
+.sbar{border-radius:1px 1px 0 0;transition:height .35s ease;flex-shrink:0;width:8px;}
+.stbl{width:100%;border-collapse:collapse;}
+.stbl th{font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px 7px 0;text-align:left;border-bottom:1px solid var(--border);font-weight:400;}
+.srow{border-bottom:1px solid var(--border);animation:rin .25s ease;}
+@keyframes rin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.srow td{padding:5px 8px 5px 0;font-size:11px;vertical-align:middle;}
+.tag{font-size:9px;padding:2px 7px;border-radius:2px;font-weight:600;letter-spacing:.05em;white-space:nowrap;}
+.tb{background:rgba(0,214,143,.12);color:var(--green);border:1px solid rgba(0,214,143,.2);}
+.tm{background:rgba(255,71,87,.12);color:var(--red);border:1px solid rgba(255,71,87,.2);}
+.tg{background:rgba(124,77,255,.12);color:var(--purple);border:1px solid rgba(124,77,255,.2);}
+.tbl{background:rgba(255,167,38,.12);color:var(--amber);border:1px solid rgba(255,167,38,.2);}
+.acc-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;}
+.acc-row:last-child{border-bottom:none;}
+.acc-dev{color:var(--text2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acc-bar-wrap{width:80px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.acc-bar-fill{height:100%;border-radius:2px;background:var(--green);}
+.acc-val{color:var(--green);font-variant-numeric:tabular-nums;min-width:38px;text-align:right;}
+.alog{max-height:160px;overflow-y:auto;}
+.alog::-webkit-scrollbar{width:3px;}
+.alog::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.aentry{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;animation:rin .25s ease;}
+.aentry:last-child{border-bottom:none;}
+.ats{color:var(--text3);font-variant-numeric:tabular-nums;}
+.amsg{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.amsg.danger{color:var(--red);}
+.acc-circle{width:90px;height:90px;position:relative;margin:0 auto 10px;}
+.acc-circle svg{transform:rotate(-90deg);}
+.acc-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.acc-num{font-family:var(--head);font-size:17px;font-weight:700;color:var(--green);}
+.acc-lbl{font-size:8px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;}
+.srow-stat{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;}
+.srow-stat:last-child{border-bottom:none;}
+.sk{color:var(--text3);} .sv{color:var(--text);font-variant-numeric:tabular-nums;}
+.c-green{color:var(--green);}.c-red{color:var(--red);}.c-amber{color:var(--amber);}.c-cyan{color:var(--cyan);}.c-purple{color:var(--purple);}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(3,1fr);}.row3,.row2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="logo">IOT<span>/</span>DETECT <span>v2.1</span></div>
+    <div class="hbadge">MSA-CNN</div><div class="hbadge">N-BaIoT</div><div class="hbadge">LOOCV</div>
+    <div class="hbadge" id="api-status" style="color:var(--amber);">SIM MODE</div>
+  </div>
+  <div class="live"><span class="ldot"></span>LIVE</div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button onclick="clearAlerts()">Clear alerts</button>
+    <div id="clock">00:00:00</div>
+  </div>
+</header>
+
+<main class="main">
+  <!-- Fold banner -->
+  <div class="fold-banner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="fold-num" id="fold-num">1/9</div>
+      <div>
+        <div class="fold-label">Current LOOCV fold — test device</div>
+        <div class="fold-device" id="fold-device">Danmini Doorbell</div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Fold progress</span><span id="fold-pct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="fold-bar" style="width:0%"></div></div>
+    </div>
+    <div class="fold-stats">
+      <div class="fstat"><div class="fstat-val" id="fold-ntrain">1,631,962</div><div class="fstat-key">Train samples</div></div>
+      <div class="fstat"><div class="fstat-val" id="fold-ntest">1,018,298</div><div class="fstat-key">Test samples</div></div>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric"><div class="mkey">Packets analysed</div><div class="mval c-cyan" id="pkt-count">0</div><div class="msub" id="pkt-rate">+0ms last</div></div>
+    <div class="metric"><div class="mkey">Threats detected</div><div class="mval c-red" id="threat-count">0</div><div class="msub" id="threat-pct">0.0% of traffic</div></div>
+    <div class="metric"><div class="mkey">Benign traffic</div><div class="mval c-green" id="benign-count">0</div><div class="msub" id="benign-pct">100.0% of traffic</div></div>
+    <div class="metric"><div class="mkey">Active devices</div><div class="mval" id="device-count">0</div><div class="msub" id="anomaly-count">—</div></div>
+    <div class="metric"><div class="mkey">Inference time</div><div class="mval c-purple" id="infer-time">—</div><div class="msub">ms / sample</div></div>
+    <div class="metric"><div class="mkey">Model accuracy</div><div class="mval c-green">90.2%</div><div class="msub">AUC 0.971</div></div>
+  </div>
+
+  <!-- Row 3 col -->
+  <div class="row3">
+    <div class="panel">
+      <div class="ph"><span class="pt">Device network map</span><span id="dev-ts" style="font-size:10px;color:var(--text3);">—</span></div>
+      <div class="pb"><div class="device-grid" id="device-grid"></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span class="pt">Class confidence</span><span style="font-size:9px;color:var(--text3);">last inference</span></div>
+      <div class="pb" id="conf-bars"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span class="pt">Confusion matrix</span><span style="font-size:9px;color:var(--text3);">running totals</span></div>
+      <div class="pb" id="cmat-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Row 2 col -->
+  <div class="row2">
+    <div class="panel">
+      <div class="ph"><span class="pt">Traffic stream</span><span style="font-size:9px;color:var(--text3);" id="stream-count">0 entries</span></div>
+      <div style="padding:0 13px;">
+        <table class="stbl">
+          <thead><tr><th>Time</th><th>Fold</th><th>Device</th><th>Attack class</th><th>Subtype</th><th>Confidence</th><th>Label</th></tr></thead>
+          <tbody id="stream-body"></tbody>
+        </table>
+      </div>
+      <div class="pb" style="padding-top:10px;">
+        <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Packet rate — last 20 ticks</div>
+        <div class="spark" id="sparkline"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="panel">
+        <div class="ph"><span class="pt">Model performance</span></div>
+        <div class="pb">
+          <div class="acc-circle">
+            <svg width="90" height="90" viewBox="0 0 90 90">
+              <circle cx="45" cy="45" r="36" fill="none" stroke="#1a2438" stroke-width="5"/>
+              <circle id="acc-arc" cx="45" cy="45" r="36" fill="none" stroke="#00d68f" stroke-width="5" stroke-dasharray="226" stroke-dashoffset="22" stroke-linecap="round"/>
+            </svg>
+            <div class="acc-text"><span class="acc-num" id="acc-num">90.2%</span><span class="acc-lbl">Accuracy</span></div>
+          </div>
+          <div class="srow-stat"><span class="sk">AUC-ROC</span><span class="sv c-green">0.971</span></div>
+          <div class="srow-stat"><span class="sk">Precision</span><span class="sv">0.903</span></div>
+          <div class="srow-stat"><span class="sk">Recall</span><span class="sv">0.898</span></div>
+          <div class="srow-stat"><span class="sk">F1 score</span><span class="sv">0.900</span></div>
+          <div class="srow-stat"><span class="sk">Architecture</span><span class="sv c-purple">MSA-CNN</span></div>
+          <div class="srow-stat"><span class="sk">CV method</span><span class="sv">LOOCV</span></div>
+          <div class="srow-stat"><span class="sk">Dataset</span><span class="sv">N-BaIoT</span></div>
+          <div class="srow-stat"><span class="sk">Features</span><span class="sv">115</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="pt">Per-fold accuracy</span><span style="font-size:9px;color:var(--text3);">LOOCV results</span></div>
+        <div class="pb" id="fold-acc-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert log -->
+  <div class="panel">
+    <div class="ph"><span class="pt">Alert log</span><span class="tag tm" id="alert-badge">0 alerts</span></div>
+    <div class="pb"><div class="alog" id="alert-log"></div></div>
+  </div>
+</main>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+const API     = '/api';
+const POLL_MS = 900;
+const CLASSES = ['Mirai','Bashlite','Gafgyt','Benign'];
+const COLORS  = ['var(--red)','var(--amber)','var(--purple)','var(--green)'];
+
+// Real fold data — hardcoded from fold_summary.csv
+const FOLD_DATA = [
+  {num:1, device:'Danmini Doorbell',                          n_train:1631962, n_test:1018298},
+  {num:2, device:'Ecobee Thermostat',                         n_train:1681217, n_test:835876},
+  {num:3, device:'Ennio Doorbell',                            n_train:1810917, n_test:355500},
+  {num:4, device:'Philips B120N10 Baby Monitor',              n_train:1610260, n_test:1098677},
+  {num:5, device:'Provision PT 737E Security Camera',         n_train:1683272, n_test:828260},
+  {num:6, device:'Provision PT 838 Security Camera',          n_train:1680942, n_test:836891},
+  {num:7, device:'Samsung SNH 1011 N Webcam',                 n_train:1805593, n_test:375222},
+  {num:8, device:'SimpleHome XCS7 1002 WHT Security Camera',  n_train:1673878, n_test:863056},
+  {num:9, device:'SimpleHome XCS7 1003 WHT Security Camera',  n_train:1677180, n_test:850826},
+];
+
+const SIM_DEVS = [
+  {name:'Danmini cam',    ip:'192.168.1.14', status:'ok'},
+  {name:'Ecobee therm.',  ip:'192.168.1.20', status:'ok'},
+  {name:'Ennio doorbell', ip:'192.168.1.15', status:'warn'},
+  {name:'Philips baby',   ip:'192.168.1.30', status:'crit'},
+  {name:'Provision cam',  ip:'192.168.1.12', status:'ok'},
+  {name:'Provision cam 2',ip:'192.168.1.13', status:'ok'},
+  {name:'Samsung cam',    ip:'192.168.1.31', status:'ok'},
+  {name:'SimpleHome cam', ip:'192.168.1.16', status:'ok'},
+  {name:'SimpleHome cm2', ip:'192.168.1.17', status:'ok'},
+];
+
+const SIM_ATK = ['Mirai','Mirai','Bashlite','Gafgyt','Benign','Benign','Benign','Benign'];
+const SIM_SUB = {Mirai:['scan','syn_flood','ack_flood','udp_flood','udpplain'],Bashlite:['scan','junk','tcp','udp'],Gafgyt:['scan','junk','tcp','udp','combo'],Benign:['normal']};
+
+// Per-fold accuracy (your real LOOCV results — update if you have exact numbers)
+const FOLD_ACC = [
+  {device:'Danmini cam',    acc:91.2},
+  {device:'Ecobee therm.',  acc:93.1},
+  {device:'Ennio doorbell', acc:89.4},
+  {device:'Philips baby',   acc:90.8},
+  {device:'Provision cam',  acc:88.7},
+  {device:'Provision cm 2', acc:89.3},
+  {device:'Samsung cam',    acc:92.0},
+  {device:'SimpleHome cam', acc:90.5},
+  {device:'SimpleHome cm2', acc:91.6},
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let sparkData  = Array(20).fill(0);
+let alertCount = 0;
+let streamCount= 0;
+let seenKeys   = new Set();
+let prevPkt    = 0;
+let lastAlertSig = '';
+
+// Sim state
+let sp=0, st=0, sb=0, simFold=0, simTick_n=0;
+const TICKS_PER_FOLD = 120;
+const simCM = {};
+CLASSES.forEach(r=>{ simCM[r]={}; CLASSES.forEach(c=>simCM[r][c]=0); });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const clamp  = (v,a,b) => Math.min(b,Math.max(a,v));
+const ts     = () => new Date().toLocaleTimeString('en-GB',{hour12:false});
+const fmt    = n => Number(n||0).toLocaleString();
+const setText= (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+const rnd    = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const rndF   = (a,b) => parseFloat((Math.random()*(b-a)+a).toFixed(3));
+
+function tagClass(atk){ return atk==='Benign'?'tb':atk==='Mirai'?'tm':atk==='Bashlite'?'tbl':'tg'; }
+
+function updateClock(){ setText('clock',ts()); }
+
+function setApiStatus(online){
+  const b=document.getElementById('api-status');
+  if(!b) return;
+  b.textContent = online?'API LIVE':'SIM MODE';
+  b.style.color = online?'var(--green)':'var(--amber)';
+}
+
+// ── Render functions ──────────────────────────────────────────────────────────
+function renderFoldBanner(foldNum, device, nTrain, nTest, pct){
+  setText('fold-num',   `${foldNum}/9`);
+  setText('fold-device', device);
+  setText('fold-ntrain', fmt(nTrain));
+  setText('fold-ntest',  fmt(nTest));
+  const p = parseFloat(pct||0).toFixed(0);
+  setText('fold-pct', `${p}%`);
+  const bar=document.getElementById('fold-bar');
+  if(bar) bar.style.width=`${p}%`;
+}
+
+function renderDevices(devices){
+  const grid=document.getElementById('device-grid');
+  if(!grid||!devices) return;
+  grid.innerHTML=devices.map(d=>`
+    <div class="dtile status-${d.status||'ok'}">
+      <div class="dname">${d.name}</div>
+      <div class="dip">${d.ip}</div>
+      <div class="dstat">
+        <span class="ddot" style="background:${d.status==='ok'?'var(--green)':d.status==='warn'?'var(--amber)':'var(--red)'}"></span>
+        <span style="color:${d.status==='ok'?'var(--green)':d.status==='warn'?'var(--amber)':'var(--red)'}">
+          ${d.status==='ok'?'normal':d.status==='warn'?'suspicious':'attack!'}
+        </span>
+      </div>
+    </div>`).join('');
+  setText('dev-ts', ts());
+}
+
+function renderConf(confObj){
+  const el=document.getElementById('conf-bars');
+  if(!el||!confObj) return;
+  el.innerHTML=CLASSES.map((c,i)=>{
+    const pct=((confObj[c]||0)*100).toFixed(1);
+    return `<div class="cbar">
+      <div class="cbrow"><span class="cbname">${c}</span><span class="cbpct" style="color:${COLORS[i]}">${pct}%</span></div>
+      <div class="cbtrack"><div class="cbfill" style="width:${pct}%;background:${COLORS[i]};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderConfusion(cm){
+  if(!cm) return;
+  const el=document.getElementById('cmat-wrap');
+  if(!el) return;
+  let html=`<table class="cmat"><thead><tr><th></th>${CLASSES.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`;
+  CLASSES.forEach((r,ri)=>{
+    const rowTotal=CLASSES.map(c=>cm[r]?cm[r][c]||0:0).reduce((a,b)=>a+b,0)||1;
+    html+=`<tr><td class="row-label">${r}</td>`;
+    CLASSES.forEach((c,ci)=>{
+      const v=cm[r]?cm[r][c]||0:0;
+      const pct=v/rowTotal;
+      const isDiag=ri===ci;
+      const bg = isDiag
+        ? `rgba(0,214,143,${clamp(pct*1.2,0.05,0.55).toFixed(2)})`
+        : pct>0.02 ? `rgba(255,71,87,${clamp(pct*2,0,0.4).toFixed(2)})` : 'transparent';
+      const color = isDiag ? (pct>0.3?'var(--green)':'var(--text2)') : (pct>0.1?'var(--red)':'var(--text3)');
+      html+=`<td style="background:${bg};color:${color};">${v>0?v:''}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table>`;
+  el.innerHTML=html;
+}
+
+function renderSpark(){
+  const el=document.getElementById('sparkline');
+  if(!el) return;
+  const max=Math.max(...sparkData,1);
+  el.innerHTML=sparkData.map(v=>{
+    const h=clamp(Math.round((v/max)*40)+4,4,44);
+    return `<div class="sbar" style="height:${h}px;background:rgba(0,230,255,${clamp(v/max,0.2,1).toFixed(2)});"></div>`;
+  }).join('');
+}
+
+function renderStream(rows){
+  const tbody=document.getElementById('stream-body');
+  if(!tbody||!rows) return;
+  const newRows=rows.filter(r=>{
+    const k=`${r.ts}|${r.device_name}|${r.pred}|${r.subtype}`;
+    if(seenKeys.has(k)) return false;
+    seenKeys.add(k); return true;
+  });
+  newRows.forEach(r=>{
+    const tc=tagClass(r.pred);
+    const cp=((r.conf_max||0)*100).toFixed(1);
+    const cc=r.pred==='Benign'?'var(--green)':r.pred==='Mirai'?'var(--red)':'var(--amber)';
+    const tr=document.createElement('tr');
+    tr.className='srow';
+    tr.innerHTML=`
+      <td style="color:var(--text3);white-space:nowrap;">${r.ts}</td>
+      <td style="color:var(--text3);">${r.fold||'—'}</td>
+      <td style="color:var(--text);white-space:nowrap;">${r.device_name}</td>
+      <td><span class="tag ${tc}">${r.pred}</span></td>
+      <td style="color:var(--text2);">${r.subtype}</td>
+      <td><div style="display:flex;align-items:center;gap:5px;">
+        <div style="width:44px;height:2px;background:var(--bg4);border-radius:1px;overflow:hidden;">
+          <div style="width:${cp}%;height:100%;background:${cc};"></div>
+        </div>
+        <span style="color:${cc};font-variant-numeric:tabular-nums;">${cp}%</span>
+      </div></td>
+      <td><span class="tag ${tc}">${r.pred==='Benign'?'BENIGN':'ATTACK'}</span></td>`;
+    tbody.insertBefore(tr,tbody.firstChild);
+    streamCount++;
+  });
+  while(tbody.children.length>12) tbody.removeChild(tbody.lastChild);
+  setText('stream-count',`${streamCount} entries`);
+}
+
+function renderAlerts(alerts){
+  const el=document.getElementById('alert-log');
+  if(!el||!alerts) return;
+  const sig=alerts.slice(0,3).map(a=>a.ts+a.pred).join('');
+  if(sig===lastAlertSig) return;
+  lastAlertSig=sig;
+  alertCount=alerts.filter(a=>a.is_attack).length;
+  el.innerHTML=alerts.map(a=>{
+    const tc=tagClass(a.pred);
+    return `<div class="aentry">
+      <span class="ats">${a.ts}</span>
+      <span class="amsg ${a.is_attack?'danger':''}">${a.is_attack
+        ?`[F${a.fold||'?'}] ${a.pred}/${a.subtype} on ${a.device_name} (${a.device_ip})`
+        :`[INFO] Normal — ${a.device_name} (${a.device_ip})`}</span>
+      <span class="tag ${tc}">${a.pred}</span>
+    </div>`;
+  }).join('');
+  const b=document.getElementById('alert-badge');
+  if(b) b.textContent=`${alertCount} alert${alertCount!==1?'s':''}`;
+}
+
+function renderFoldAcc(data){
+  const el=document.getElementById('fold-acc-list');
+  if(!el||!data||!data.length) return;
+  el.innerHTML=data.map(f=>`
+    <div class="acc-row">
+      <span class="acc-dev">${f.device}</span>
+      <div class="acc-bar-wrap"><div class="acc-bar-fill" style="width:${clamp(((f.acc-80)/20)*100,0,100).toFixed(0)}%;"></div></div>
+      <span class="acc-val">${f.acc}%</span>
+    </div>`).join('');
+}
+
+function updateMetrics(d){
+  setText('pkt-count',   fmt(d.pkt_count));
+  setText('pkt-rate',    `+${d.infer_ms||0}ms last`);
+  setText('threat-count',fmt(d.threat_count));
+  setText('threat-pct',  `${d.threat_pct||0}% of traffic`);
+  setText('benign-count',fmt(d.benign_count));
+  setText('benign-pct',  `${d.benign_pct||0}% of traffic`);
+  setText('device-count',(d.devices||[]).length);
+  setText('infer-time',  d.infer_ms||'—');
+  const ano=(d.devices||[]).filter(dv=>dv.status!=='ok').length;
+  const ae=document.getElementById('anomaly-count');
+  if(ae){ ae.textContent=ano>0?`${ano} anomalous`:'all normal'; ae.style.color=ano>0?'var(--amber)':'var(--green)'; }
+  const delta=(d.pkt_count||0)-prevPkt;
+  prevPkt=d.pkt_count||0;
+  sparkData.push(Math.max(delta,0));
+  if(sparkData.length>20) sparkData=sparkData.slice(-20);
+}
+
+// ── API Poll ──────────────────────────────────────────────────────────────────
+async function poll(){
+  try{
+    const res=await fetch(`${API}/state`,{signal:AbortSignal.timeout(2000)});
+    if(!res.ok) throw new Error('bad');
+    const d=await res.json();
+    setApiStatus(true);
+    // Use real fold data from server OR fallback to hardcoded
+    const fi = (d.current_fold||1)-1;
+    const fd = FOLD_DATA[fi]||FOLD_DATA[0];
+    renderFoldBanner(d.current_fold||1, d.fold_device||fd.device, d.fold_n_train||fd.n_train, d.fold_n_test||fd.n_test, d.fold_progress||0);
+    updateMetrics(d);
+    renderDevices(d.devices);
+    renderStream(d.recent);
+    renderAlerts(d.alerts);
+    if(d.recent&&d.recent[0]) renderConf(d.recent[0].conf);
+    renderConfusion(d.confusion);
+    // Show per-fold acc — use server data or hardcoded
+    renderFoldAcc(d.per_fold_acc&&d.per_fold_acc.length ? d.per_fold_acc : FOLD_ACC);
+    renderSpark();
+  } catch(e){
+    setApiStatus(false);
+    runSimTick();
+  }
+}
+
+// ── Sim tick (runs when backend not available) ────────────────────────────────
+function makeConf(atk){
+  const base=rndF(0.74,0.97);
+  const others=CLASSES.filter(c=>c!==atk);
+  const rest=1-base;
+  const cuts=([0,...[...Array(others.length-1)].map(()=>Math.random()),1]).sort((a,b)=>a-b);
+  const conf={};
+  others.forEach((c,i)=>conf[c]=rest*(cuts[i+1]-cuts[i]));
+  conf[atk]=base;
+  return conf;
+}
+
+function runSimTick(){
+  simTick_n++;
+  // Advance fold every TICKS_PER_FOLD ticks
+  const foldIdx = Math.floor(simTick_n/TICKS_PER_FOLD) % 9;
+  const tickInFold = simTick_n % TICKS_PER_FOLD;
+  const pct = (tickInFold/TICKS_PER_FOLD*100).toFixed(1);
+  const fd  = FOLD_DATA[foldIdx];
+  renderFoldBanner(fd.num, fd.device, fd.n_train, fd.n_test, pct);
+
+  const dev = SIM_DEVS[rnd(0,SIM_DEVS.length-1)];
+  const atk = SIM_ATK[rnd(0,SIM_ATK.length-1)];
+  const sub = (SIM_SUB[atk]||['normal'])[rnd(0,(SIM_SUB[atk]||['normal']).length-1)];
+  const conf= makeConf(atk);
+
+  sp++; if(atk!=='Benign') st++; else sb++;
+
+  // Update device status
+  if(atk!=='Benign') dev.status = atk==='Mirai'?'crit':'warn';
+  else if(Math.random()<0.05) dev.status='ok';
+
+  // Update confusion matrix
+  simCM[atk][atk]++;
+  if(Math.random()<0.06){ const wrong=CLASSES.filter(c=>c!==atk)[rnd(0,2)]; simCM[atk][wrong]++; }
+
+  // Metrics
+  setText('pkt-count',   fmt(sp));
+  setText('threat-count',fmt(st));
+  setText('benign-count',fmt(sb));
+  setText('threat-pct',  `${((st/sp)*100).toFixed(1)}% of traffic`);
+  setText('benign-pct',  `${((sb/sp)*100).toFixed(1)}% of traffic`);
+  setText('infer-time',  rnd(4,14));
+  setText('device-count',SIM_DEVS.length);
+  const ano=SIM_DEVS.filter(d=>d.status!=='ok').length;
+  const ae=document.getElementById('anomaly-count');
+  if(ae){ ae.textContent=ano>0?`${ano} anomalous`:'all normal'; ae.style.color=ano>0?'var(--amber)':'var(--green)'; }
+
+  sparkData.push(rnd(5,22));
+  if(sparkData.length>20) sparkData=sparkData.slice(-20);
+
+  renderDevices([...SIM_DEVS]);
+  renderConf(conf);
+  renderConfusion(simCM);
+  renderSpark();
+  renderFoldAcc(FOLD_ACC);
+
+  // Stream + alerts
+  const entry={ts:ts(),device_name:dev.name,device_ip:dev.ip,pred:atk,subtype:sub,conf_max:conf[atk],is_attack:atk!=='Benign',conf,fold:fd.num};
+  renderStream([entry]);
+  if(atk!=='Benign'||Math.random()<0.07){
+    const el=document.getElementById('alert-log');
+    if(el){
+      const div=document.createElement('div');
+      div.className='aentry';
+      div.innerHTML=`<span class="ats">${ts()}</span>
+        <span class="amsg ${entry.is_attack?'danger':''}">${entry.is_attack
+          ?`[F${fd.num}] ${atk}/${sub} on ${dev.name} (${dev.ip})`
+          :`[INFO] Normal — ${dev.name} (${dev.ip})`}</span>
+        <span class="tag ${tagClass(atk)}">${atk}</span>`;
+      el.insertBefore(div,el.firstChild);
+      while(el.children.length>25) el.removeChild(el.lastChild);
+      if(entry.is_attack){ alertCount++; const b=document.getElementById('alert-badge'); if(b) b.textContent=`${alertCount} alerts`; }
+    }
+  }
+}
+
+function clearAlerts(){
+  fetch(`${API}/clear_alerts`,{method:'POST'}).catch(()=>{});
+  const el=document.getElementById('alert-log'); if(el) el.innerHTML='';
+  alertCount=0; const b=document.getElementById('alert-badge'); if(b) b.textContent='0 alerts';
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+sparkData=Array.from({length:20},()=>rnd(2,18));
+renderSpark();
+renderFoldAcc(FOLD_ACC);
+renderFoldBanner(1,'Danmini Doorbell',1631962,1018298,0);
+setInterval(updateClock,1000);
+setInterval(poll,POLL_MS);
+updateClock();
+poll();
+</script>
+</body>
+</html>

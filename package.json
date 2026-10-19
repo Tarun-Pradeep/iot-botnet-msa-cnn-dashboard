@@ -1,0 +1,13 @@
+{
+  "name": "iot-botnet-detection",
+  "version": "1.0.0",
+  "description": "Live IoT Botnet Detection Dashboard - MSA-CNN",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
